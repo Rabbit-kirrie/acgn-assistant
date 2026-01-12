@@ -1,0 +1,17 @@
+# Exclude dev/test artifacts from Vercel upload
+.venv/
+.pytest_cache/
+**/__pycache__/
+**/*.pyc
+
+# Local DB/logs
+app.db
+test.db
+*.db-journal
+uvicorn*.log
+
+# Not needed in production runtime
+tests/
+scripts/
+Dockerfile
+docker-compose.yml
