@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>登录 - ACGN咨询助手</title>
+  <link rel="stylesheet" href="/static/auth.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="card card--login">
+      <div class="top">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <p class="title">QQ 邮箱登录</p>
+          <p class="subtitle">仅支持 @qq.com</p>
+        </div>
+      </div>
+
+      <div class="form">
+        <div>
+          <label class="sr-only" for="email">QQ 邮箱</label>
+          <input id="email" type="email" autocomplete="username" placeholder="邮箱" />
+        </div>
+        <div>
+          <label class="sr-only" for="password">密码</label>
+          <input id="password" type="password" autocomplete="current-password" placeholder="密码" />
+        </div>
+
+        <div class="err" id="err"></div>
+
+        <button class="btn" id="btnLogin">登录</button>
+        <button class="btn2" id="btnGuest" title="不会要求 QQ 邮箱">游客模式</button>
+
+        <div class="footer">
+          <div class="hint"><a href="/register">注册账号</a> · <a href="/forgot">忘记密码</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const setErr = (msg) => { $("err").textContent = msg || ""; };
+
+  async function login() {
+    setErr("");
+    const email = $("email").value.trim();
+    const password = $("password").value;
+    if (!email.endsWith("@qq.com")) { setErr("仅支持 QQ 邮箱（@qq.com）"); return; }
+    if (!password) { setErr("请输入密码"); return; }
+
+    $("btnLogin").disabled = true;
+    try {
+      const body = new URLSearchParams();
+      body.set("username", email);
+      body.set("password", password);
+      const r = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "登录失败");
+      localStorage.setItem("acgn_demo_token", data.access_token);
+      // If user previously used guest mode, clear the sticky guest marker.
+      try { localStorage.removeItem('is_guest'); } catch (_) {}
+      location.href = "/app";
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      $("btnLogin").disabled = false;
+    }
+  }
+
+  async function guest() {
+    setErr("");
+    $("btnGuest").disabled = true;
+    try {
+      const r = await fetch("/auth/guest", { method: "POST" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "游客模式失败");
+      localStorage.setItem("acgn_demo_token", data.access_token);
+      localStorage.setItem("is_guest", "true");
+      location.href = "/app";
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      $("btnGuest").disabled = false;
+    }
+  }
+
+  $("btnLogin").addEventListener("click", login);
+  $("btnGuest").addEventListener("click", guest);
+  $("password").addEventListener("keydown", (ev) => { if (ev.key === "Enter") login(); });
+</script>
+</body>
+</html>

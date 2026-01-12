@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>服务条款 - ACGN咨询助手</title>
+  <link rel="stylesheet" href="/static/auth.css" />
+</head>
+<body>
+  <div class="legal-overlay">
+    <div class="legal-modal" role="dialog" aria-modal="true" aria-label="服务条款">
+      <button class="legal-close" id="btnClose" aria-label="关闭">×</button>
+      <div class="legal-head">服务条款</div>
+      <div class="legal-body">
+        <h2>1. 服务说明</h2>
+        <p>本服务为 ACGN 资讯与推荐类助手，提供内容检索、整理、建议与对话式交互能力。我们会持续改进功能与体验，功能形态可能调整。</p>
+
+        <h2>2. 账号与安全</h2>
+        <ul>
+          <li>你应妥善保管账号凭据，不要将账号/密码/验证码泄露给他人。</li>
+          <li>如发现异常登录或安全风险，请及时修改密码或联系管理员处理。</li>
+        </ul>
+
+        <h2>3. 使用规范</h2>
+        <ul>
+          <li>请遵守所在地法律法规与平台规则，不得利用本服务从事违法违规活动。</li>
+          <li>禁止请求或传播盗版、破解、绕过付费、侵权资源等内容。</li>
+          <li>禁止对服务进行攻击、滥用接口、刷流量或影响系统稳定性的行为。</li>
+        </ul>
+
+        <h2>4. 内容与免责声明</h2>
+        <p>本服务输出内容仅供参考，可能存在不准确或过时信息。对于因使用本服务而产生的直接或间接损失，我们将在法律允许范围内免责。</p>
+
+        <h2>5. 账号处置</h2>
+        <p>如你违反本条款或相关规则，我们可能采取包括但不限于：限制功能、暂停服务、删除内容、封禁账号等措施。</p>
+
+        <h2>6. 条款更新</h2>
+        <p>我们可能不时更新本条款。更新后继续使用即视为你接受更新后的条款。</p>
+
+        <p style="color:#64748b;font-size:12px;margin-top:12px;">更新时间：2026-01-11</p>
+      </div>
+
+      <div class="legal-actions">
+        <button class="legal-btn" id="btnOk">了解</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  function goBack() {
+    // Prefer going back to where user came from; fallback to /register
+    if (history.length > 1) history.back();
+    else location.href = "/register";
+  }
+
+  document.getElementById("btnClose").addEventListener("click", goBack);
+  document.getElementById("btnOk").addEventListener("click", goBack);
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") goBack(); });
+</script>
+</body>
+</html>

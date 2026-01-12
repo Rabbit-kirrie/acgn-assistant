@@ -1,0 +1,25 @@
+# Python / venv
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Environment (secrets)
+.env
+.env.local
+
+# Local databases
+app.db
+test.db
+*.db-journal
+
+# Logs
+uvicorn.out.log
+uvicorn.err.log
+
+# OS/editor
+.vscode/
+.DS_Store
+Thumbs.db

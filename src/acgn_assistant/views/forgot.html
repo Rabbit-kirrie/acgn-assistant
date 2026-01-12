@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>忘记密码 - ACGN咨询助手</title>
+  <link rel="stylesheet" href="/static/auth.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="card card--forgot">
+      <div class="top">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <p class="title">忘记密码</p>
+          <p class="subtitle">输入 QQ 邮箱获取验证码，验证后重置密码</p>
+        </div>
+      </div>
+
+      <div class="form">
+        <!-- Step 1: only email + send -->
+        <div id="step1">
+          <div>
+            <label class="sr-only" for="email">QQ 邮箱</label>
+            <input id="email" type="email" autocomplete="email" placeholder="邮箱" />
+          </div>
+
+          <div class="row">
+            <button class="btn" id="btnSend">发送邮件</button>
+            <button class="btn2 hidden" id="btnResend" disabled>重新发送</button>
+            <span class="small hidden" id="countdown"></span>
+          </div>
+
+          <div class="ok" id="ok"></div>
+          <div class="err" id="err"></div>
+        </div>
+
+        <!-- Step 2: reveal after send succeeds -->
+        <div id="step2" class="hidden">
+          <div class="grid">
+            <div>
+              <label class="sr-only" for="code">验证码</label>
+              <input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="验证码（6 位）" />
+            </div>
+          </div>
+          <div>
+            <label class="sr-only" for="newPassword">新密码</label>
+            <input id="newPassword" type="password" autocomplete="new-password" placeholder="新密码（至少 6 位）" />
+          </div>
+          <div>
+            <label class="sr-only" for="newPassword2">确认新密码</label>
+            <input id="newPassword2" type="password" autocomplete="new-password" placeholder="确认新密码" />
+          </div>
+
+          <button class="btn" id="btnReset">验证并重置</button>
+        </div>
+
+        <div class="footer">
+          <div class="hint"><a href="/login">返回登录</a> · <a href="/">返回首页</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const setErr = (msg) => { $("err").textContent = msg || ""; };
+  const setOk  = (msg) => { $("ok").textContent  = msg || ""; };
+
+  let resendLeft = 0;
+  let t = null;
+
+  function showStep2() {
+    $("step2").classList.remove("hidden");
+  }
+
+  function showResendUi() {
+    $("btnSend").classList.add("hidden");
+    $("btnResend").classList.remove("hidden");
+    $("countdown").classList.remove("hidden");
+  }
+
+  function tick() {
+    if (resendLeft <= 0) {
+      clearInterval(t); t = null;
+      $("btnResend").disabled = false;
+      $("countdown").textContent = "";
+      return;
+    }
+    $("countdown").textContent = `(${resendLeft}s)`;
+    resendLeft -= 1;
+  }
+
+  function startCountdown(seconds) {
+    resendLeft = seconds;
+    showResendUi();
+    $("btnResend").disabled = true;
+    if (t) clearInterval(t);
+    tick();
+    t = setInterval(tick, 1000);
+  }
+
+  async function sendCode() {
+    setErr(""); setOk("");
+    const email = $("email").value.trim();
+    if (!email.endsWith("@qq.com")) { setErr("仅支持 QQ 邮箱（@qq.com）"); return; }
+
+    $("btnSend").disabled = true;
+    $("btnResend").disabled = true;
+    try {
+      const r = await fetch("/auth/password-reset/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (r.status === 429) {
+          const ra = parseInt(r.headers.get("Retry-After") || "", 10);
+          const waitS = Number.isFinite(ra) && ra > 0 ? ra : 30;
+          showResendUi();
+          startCountdown(waitS);
+          showStep2();
+        }
+        throw new Error(data.detail || "发送失败");
+      }
+      setOk("邮件已发送（包含验证码，有效期 10 分钟）。请查收邮箱。");
+      showResendUi();
+      startCountdown(30);
+      showStep2();
+      // Move focus to step 2 for a smoother flow
+      setTimeout(() => { try { $("code").focus(); } catch (_) {} }, 0);
+      // dev/test: optionally show debug code if provided
+      if (data.debug_code) {
+        setOk(`邮件已发送（调试码：${data.debug_code}）`);
+      }
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      if (!$("btnSend").classList.contains("hidden")) {
+        $("btnSend").disabled = false;
+      }
+    }
+  }
+
+  async function resetPassword() {
+    setErr(""); setOk("");
+    const email = $("email").value.trim();
+    const code = $("code").value.trim();
+    const newPassword = $("newPassword").value;
+    const newPassword2 = $("newPassword2").value;
+
+    if (!email.endsWith("@qq.com")) { setErr("仅支持 QQ 邮箱（@qq.com）"); return; }
+    if (!code || code.length < 4) { setErr("请输入验证码"); return; }
+    if (!newPassword || newPassword.length < 6) { setErr("新密码至少 6 位"); return; }
+    if (newPassword !== newPassword2) { setErr("两次新密码不一致"); return; }
+
+    $("btnReset").disabled = true;
+    try {
+      const r = await fetch("/auth/password-reset/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code, new_password: newPassword })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "重置失败");
+      setOk("密码已重置，请使用新密码登录。");
+      setTimeout(() => { location.href = "/login"; }, 900);
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      $("btnReset").disabled = false;
+    }
+  }
+
+  $("btnSend").addEventListener("click", sendCode);
+  $("btnResend").addEventListener("click", sendCode);
+  $("btnReset").addEventListener("click", resetPassword);
+</script>
+</body>
+</html>

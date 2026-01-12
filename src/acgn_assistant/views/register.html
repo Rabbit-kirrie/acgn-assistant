@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>注册 - ACGN咨询助手</title>
+  <link rel="stylesheet" href="/static/auth.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="card card--register">
+      <div class="top">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <p class="subtitle">创建账号后会自动登录</p>
+        </div>
+      </div>
+
+      <div class="form">
+        <div>
+          <label class="sr-only" for="email">QQ 邮箱</label>
+          <input id="email" type="email" autocomplete="username" placeholder="QQ 邮箱（@qq.com）" />
+        </div>
+
+        <div class="row">
+          <button class="btn" id="btnSendCode" type="button" disabled>发送验证码</button>
+          <button class="btn hidden" id="btnResend" type="button" disabled>重新发送</button>
+          <span class="small hidden" id="countdown"></span>
+        </div>
+
+        <div id="step2" class="hidden">
+          <div>
+            <label class="sr-only" for="code">验证码</label>
+            <input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="验证码（6 位）" />
+          </div>
+          <div>
+            <label class="sr-only" for="username">昵称</label>
+            <input id="username" type="text" autocomplete="nickname" placeholder="昵称" />
+          </div>
+          <div>
+            <label class="sr-only" for="password">密码</label>
+            <input id="password" type="password" autocomplete="new-password" placeholder="密码（至少 6 位）" />
+          </div>
+          <div>
+            <label class="sr-only" for="password2">确认密码</label>
+            <input id="password2" type="password" autocomplete="new-password" placeholder="确认密码" />
+          </div>
+
+          <button class="btn" id="btnRegister" type="button" disabled>注册并登录</button>
+        </div>
+
+        <label class="agree" for="agree">
+          <input id="agree" type="checkbox" />
+          <span>我已阅读并同意<a href="/terms">服务条款</a>与<a href="/privacy">隐私政策</a></span>
+        </label>
+
+        <div class="ok" id="ok"></div>
+        <div class="err" id="err"></div>
+
+        <div class="footer">
+          <div class="hint">已有账户？ <a href="/login">点击登录</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const setErr = (msg) => { $("err").textContent = msg || ""; };
+  const setOk  = (msg) => { $("ok").textContent  = msg || ""; };
+
+  let resendLeft = 0;
+  let t = null;
+
+  function showStep2() {
+    $("step2").classList.remove("hidden");
+  }
+
+  function showResendUi() {
+    $("btnSendCode").classList.add("hidden");
+    $("btnResend").classList.remove("hidden");
+    $("countdown").classList.remove("hidden");
+  }
+
+  function tick() {
+    if (resendLeft <= 0) {
+      clearInterval(t); t = null;
+      $("btnResend").disabled = !$("agree").checked;
+      $("countdown").textContent = "";
+      return;
+    }
+    $("countdown").textContent = `(${resendLeft}s)`;
+    resendLeft -= 1;
+  }
+
+  function startCountdown(seconds) {
+    resendLeft = seconds;
+    showResendUi();
+    $("btnResend").disabled = true;
+    if (t) clearInterval(t);
+    tick();
+    t = setInterval(tick, 1000);
+  }
+
+  async function sendCode() {
+    setErr(""); setOk("");
+    if (!$("agree").checked) { setErr("请先勾选同意服务条款与隐私政策"); return; }
+    const email = $("email").value.trim();
+    if (!email.endsWith("@qq.com")) { setErr("仅支持 QQ 邮箱（@qq.com）"); return; }
+
+    $("btnSendCode").disabled = true;
+    $("btnResend").disabled = true;
+    try {
+      const r = await fetch("/auth/register/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        // If backend rate-limited, honor Retry-After and show countdown.
+        if (r.status === 429) {
+          const ra = parseInt(r.headers.get("Retry-After") || "", 10);
+          const waitS = Number.isFinite(ra) && ra > 0 ? ra : 60;
+          showResendUi();
+          startCountdown(waitS);
+          showStep2();
+        }
+        throw new Error(data.detail || "发送失败");
+      }
+
+      setOk("验证码已发送到邮箱（有效期 10 分钟）。请查收。");
+      showResendUi();
+      startCountdown(60);
+      showStep2();
+      setTimeout(() => { try { $("code").focus(); } catch (_) {} }, 0);
+      if (data.debug_code) {
+        // dev/test convenience
+        $("code").value = String(data.debug_code);
+        setOk(`验证码已发送（调试码：${data.debug_code}）`);
+      }
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      // Keep the initial button hidden once we switch to resend UI.
+      if (!$("btnSendCode").classList.contains("hidden")) {
+        $("btnSendCode").disabled = false;
+      }
+    }
+  }
+
+  async function register() {
+    setErr(""); setOk("");
+    const email = $("email").value.trim();
+    const code = ($("code")?.value || "").trim();
+    const username = $("username").value.trim();
+    const password = $("password").value;
+    const password2 = $("password2").value;
+
+    if (!$("agree").checked) { setErr("请先勾选同意服务条款与隐私政策"); return; }
+
+    if (!email.endsWith("@qq.com")) { setErr("仅支持 QQ 邮箱（@qq.com）"); return; }
+    if (!code || code.length < 4) { setErr("请输入验证码"); return; }
+    if (!username) { setErr("请输入昵称"); return; }
+    if (!password || password.length < 6) { setErr("密码至少 6 位"); return; }
+    if (password !== password2) { setErr("两次密码不一致"); return; }
+
+    $("btnRegister").disabled = true;
+    try {
+      const r = await fetch("/auth/register/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code, username, password })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "注册失败");
+      localStorage.setItem("acgn_demo_token", data.access_token);
+      localStorage.removeItem("is_guest");
+      location.href = "/app";
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      // Re-enable based on current UI state
+      syncAgree();
+    }
+  }
+
+  $("btnSendCode").addEventListener("click", sendCode);
+  $("btnResend").addEventListener("click", sendCode);
+  $("btnRegister").addEventListener("click", register);
+
+  function syncAgree() {
+    const agreed = $("agree").checked;
+    const step2Visible = !$("step2").classList.contains("hidden");
+
+    // Before switching to resend UI, gate the initial send button.
+    if (!$("btnSendCode").classList.contains("hidden")) {
+      $("btnSendCode").disabled = !agreed;
+    }
+    // After switching to resend UI: allow resend only when countdown ended and agreed.
+    if (!$("btnResend").classList.contains("hidden")) {
+      $("btnResend").disabled = !agreed || (resendLeft > 0);
+    }
+
+    // Register button appears in step2; enable only when agreed.
+    $("btnRegister").disabled = !(agreed && step2Visible);
+  }
+
+  $("agree").addEventListener("change", syncAgree);
+  syncAgree();
+
+  // Optional: prefill email from query (?email=...)
+  try {
+    const u = new URL(location.href);
+    const q = (u.searchParams.get('email') || '').trim();
+    if (q) $("email").value = q;
+  } catch (_) {}
+
+  $("password2").addEventListener("keydown", (ev) => { if (ev.key === "Enter") register(); });
+</script>
+</body>
+</html>

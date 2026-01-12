@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>隐私政策 - ACGN咨询助手</title>
+  <link rel="stylesheet" href="/static/auth.css" />
+</head>
+<body>
+  <div class="legal-overlay">
+    <div class="legal-modal" role="dialog" aria-modal="true" aria-label="隐私政策">
+      <button class="legal-close" id="btnClose" aria-label="关闭">×</button>
+      <div class="legal-head">隐私政策</div>
+      <div class="legal-body">
+        <h2>1. 我们收集哪些信息</h2>
+        <ul>
+          <li>账号信息：邮箱、昵称（用于注册与登录）。</li>
+          <li>使用信息：你与系统交互产生的对话内容（用于提供服务与改进体验）。</li>
+          <li>设备/日志：基础访问日志（如时间、请求路径、状态码），用于排查问题与安全防护。</li>
+        </ul>
+
+        <h2>2. 我们如何使用信息</h2>
+        <ul>
+          <li>提供与维护服务（登录、对话、内容推荐等）。</li>
+          <li>安全与风控（防止滥用、异常检测）。</li>
+          <li>改进产品体验与性能（统计分析、错误排查）。</li>
+        </ul>
+
+        <h2>3. 信息存储与保护</h2>
+        <ul>
+          <li>密码不会以明文形式存储（使用安全哈希）。</li>
+          <li>我们采取合理的技术措施保护数据，但无法保证绝对安全。</li>
+        </ul>
+
+        <h2>4. 信息共享</h2>
+        <p>除非法律法规要求或为提供服务所必需（例如邮件发送服务），我们不会将你的个人信息出售或向无关第三方共享。</p>
+
+        <h2>5. 你的权利</h2>
+        <ul>
+          <li>你可以修改或更新账号资料。</li>
+          <li>你可以在符合规则的情况下申请删除账号或数据（如已提供相关入口）。</li>
+        </ul>
+
+        <h2>6. 政策更新</h2>
+        <p>我们可能不时更新本政策。更新后继续使用即视为你接受更新后的政策。</p>
+
+        <p style="color:#64748b;font-size:12px;margin-top:12px;">更新时间：2026-01-11</p>
+      </div>
+
+      <div class="legal-actions">
+        <button class="legal-btn" id="btnOk">了解</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  function goBack() {
+    if (history.length > 1) history.back();
+    else location.href = "/register";
+  }
+
+  document.getElementById("btnClose").addEventListener("click", goBack);
+  document.getElementById("btnOk").addEventListener("click", goBack);
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") goBack(); });
+</script>
+</body>
+</html>
