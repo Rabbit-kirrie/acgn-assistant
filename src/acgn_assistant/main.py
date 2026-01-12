@@ -65,6 +65,9 @@ def create_app() -> FastAPI:
         png_path = static_dir / "favicon.png"
         if png_path.exists():
             return RedirectResponse(url="/static/favicon.png")
+        jpg_path = static_dir / "favicon.jpg"
+        if jpg_path.exists():
+            return RedirectResponse(url="/static/favicon.jpg")
         return RedirectResponse(url="/static/favicon.svg")
 
     # 开发环境：允许本机前端（如 VS Code Live Server :5500）跨域访问 API
