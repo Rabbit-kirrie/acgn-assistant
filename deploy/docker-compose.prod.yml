@@ -1,0 +1,63 @@
+services:
+  api:
+    build: ..
+    restart: unless-stopped
+    environment:
+      ENV: prod
+      PYTHONPATH: /app/src
+      # 生产建议用 Postgres（避免 SQLite 并发写锁）
+      DATABASE_URL: postgresql+psycopg://acgn:change-me@postgres:5432/acgn
+      JWT_SECRET: change-me-in-prod
+      # LLM（可选）
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      # 邮箱（可选：忘记密码）
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      EMAIL_DEBUG_RETURN_CODE: ${EMAIL_DEBUG_RETURN_CODE:-false}
+      # 管理员引导（可选）
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: acgn
+      POSTGRES_USER: acgn
+      POSTGRES_PASSWORD: change-me
+    volumes:
+      - acgn_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U acgn -d acgn"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  acgn_pgdata:
+  caddy_data:
+  caddy_config:

@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 
 from sqlmodel import Session
 from acgn_assistant.core.config import get_settings
@@ -57,6 +58,14 @@ def create_app() -> FastAPI:
     static_dir = Path(__file__).resolve().parent / "static"
     static_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    # Browsers often request /favicon.ico by default.
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon() -> RedirectResponse:
+        png_path = static_dir / "favicon.png"
+        if png_path.exists():
+            return RedirectResponse(url="/static/favicon.png")
+        return RedirectResponse(url="/static/favicon.svg")
 
     # 开发环境：允许本机前端（如 VS Code Live Server :5500）跨域访问 API
     if settings.env == "dev":

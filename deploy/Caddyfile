@@ -1,0 +1,12 @@
+# 把下面的域名改成你自己的域名（建议已完成备案并解析到服务器公网 IP）
+# 例：acgn.example.com
+
+:80 {
+  respond "Caddy is running. Configure your domain in deploy/Caddyfile." 200
+}
+
+# 取消注释并替换域名后使用（会自动申请/续期 HTTPS 证书）
+# your-domain.com {
+#   encode gzip zstd
+#   reverse_proxy api:8000
+# }

@@ -164,6 +164,19 @@ docker compose up --build
 - `http://127.0.0.1:8000/`（HTML联调页）
 - 内置 API 文档默认关闭（`/docs`、`/redoc`、`/openapi.json`）
 
+## 国内可访问部署（不依赖 Vercel）
+
+如果你的目标是“国内用户普遍可用（不需要 VPN）”，更推荐部署到国内云服务器，并配合自定义域名 + HTTPS。
+
+仓库已提供一套生产 Compose（Postgres + Caddy HTTPS 反代），见：
+
+- deploy/README.md
+
+核心要点：
+
+- 大陆地域服务器通常需要域名备案（ICP）。
+- 不做备案可以选香港/新加坡服务器，但国内稳定性无法保证。
+
 ## Vercel 公网部署（Python Functions）
 
 本项目已补齐 Vercel 入口与路由：
