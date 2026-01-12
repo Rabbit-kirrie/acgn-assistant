@@ -76,6 +76,7 @@
 
   function showStep2() {
     $("step2").classList.remove("hidden");
+    syncUi();
   }
 
   function showResendUi() {
@@ -123,7 +124,7 @@
         // If backend rate-limited, honor Retry-After and show countdown.
         if (r.status === 429) {
           const ra = parseInt(r.headers.get("Retry-After") || "", 10);
-          const waitS = Number.isFinite(ra) && ra > 0 ? ra : 60;
+          const waitS = Number.isFinite(ra) && ra > 0 ? ra : 30;
           showResendUi();
           startCountdown(waitS);
           showStep2();
@@ -133,7 +134,7 @@
 
       setOk("验证码已发送到邮箱（有效期 10 分钟）。请查收。");
       showResendUi();
-      startCountdown(60);
+      startCountdown(30);
       showStep2();
       setTimeout(() => { try { $("code").focus(); } catch (_) {} }, 0);
       if (data.debug_code) {
@@ -141,6 +142,7 @@
         $("code").value = String(data.debug_code);
         setOk(`验证码已发送（调试码：${data.debug_code}）`);
       }
+      syncUi();
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
@@ -148,6 +150,7 @@
       if (!$("btnSendCode").classList.contains("hidden")) {
         $("btnSendCode").disabled = false;
       }
+      syncUi();
     }
   }
 
@@ -183,7 +186,7 @@
       setErr(e?.message || String(e));
     } finally {
       // Re-enable based on current UI state
-      syncAgree();
+      syncUi();
     }
   }
 
@@ -191,9 +194,27 @@
   $("btnResend").addEventListener("click", sendCode);
   $("btnRegister").addEventListener("click", register);
 
-  function syncAgree() {
-    const agreed = $("agree").checked;
+  function canRegisterNow() {
     const step2Visible = !$("step2").classList.contains("hidden");
+    if (!step2Visible) return false;
+    if (!$("agree").checked) return false;
+
+    const email = $("email").value.trim();
+    const code = ($("code")?.value || "").trim();
+    const username = $("username").value.trim();
+    const password = $("password").value;
+    const password2 = $("password2").value;
+
+    if (!email.endsWith("@qq.com")) return false;
+    if (!code || code.length < 4) return false;
+    if (!username) return false;
+    if (!password || password.length < 6) return false;
+    if (password !== password2) return false;
+    return true;
+  }
+
+  function syncUi() {
+    const agreed = $("agree").checked;
 
     // Before switching to resend UI, gate the initial send button.
     if (!$("btnSendCode").classList.contains("hidden")) {
@@ -204,12 +225,18 @@
       $("btnResend").disabled = !agreed || (resendLeft > 0);
     }
 
-    // Register button appears in step2; enable only when agreed.
-    $("btnRegister").disabled = !(agreed && step2Visible);
+    // Register button becomes enabled only when inputs are ready.
+    $("btnRegister").disabled = !canRegisterNow();
   }
 
-  $("agree").addEventListener("change", syncAgree);
-  syncAgree();
+  $("agree").addEventListener("change", syncUi);
+  ["email", "code", "username", "password", "password2"].forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener("input", syncUi);
+    el.addEventListener("change", syncUi);
+  });
+  syncUi();
 
   // Optional: prefill email from query (?email=...)
   try {
@@ -217,6 +244,8 @@
     const q = (u.searchParams.get('email') || '').trim();
     if (q) $("email").value = q;
   } catch (_) {}
+
+  syncUi();
 
   $("password2").addEventListener("keydown", (ev) => { if (ev.key === "Enter") register(); });
 </script>
