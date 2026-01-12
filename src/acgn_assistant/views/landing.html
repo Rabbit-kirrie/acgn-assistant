@@ -2292,7 +2292,7 @@
           <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">
             <button id="adminBtnToggleActive" type="button" class="btn blue" style="padding:8px 10px; font-size:12px;">${isActive ? '禁用' : '启用'}</button>
             <button id="adminBtnToggleAdmin" type="button" class="btn" style="padding:8px 10px; font-size:12px;">${isAdmin ? '撤销管理员' : '设为管理员'}</button>
-            ${canDelete ? '<button id="adminBtnDeleteUser" type="button" class="btn" style="padding:8px 10px; font-size:12px; background:rgba(239,68,68,.92); border-color:rgba(239,68,68,.55);">删除账号</button>' : ''}
+            ${canDelete ? '<button id="adminBtnDeleteUser" type="button" class="btn" style="padding:8px 10px; font-size:12px; background:rgba(239,68,68,.92); border-color:rgba(239,68,68,.55);">数据库删除</button>' : ''}
           </div>
           <div style="margin-top:10px; opacity:.7; font-size:12px; line-height:1.4;">
             ${isSelf ? '<div style="margin-top:6px; opacity:.9;">你当前选中的是自己：系统会禁止禁用/撤销自己。</div>' : ''}
@@ -2333,7 +2333,7 @@
 
       document.getElementById('adminBtnDeleteUser')?.addEventListener('click', async () => {
         try {
-          const ok = confirm('确定要删除该账号吗？\n\n删除将执行：禁用账号 + 匿名化邮箱/昵称（不可恢复）。');
+          const ok = confirm('确定要【数据库彻底删除】该账号吗？\n\n此操作不可恢复，并会清理该用户的会话/消息/记忆/档案/行为记录/留言等数据。');
           if (!ok) return;
           await api(`/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
           toast('已删除账号');

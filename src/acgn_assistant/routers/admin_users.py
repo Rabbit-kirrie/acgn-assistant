@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from fastapi import Request
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlmodel import Session, select
-from uuid import uuid4
-
+from sqlmodel import Session, delete, select
 from acgn_assistant.core.config import get_settings
 from acgn_assistant.core.security import hash_password
 from acgn_assistant.db import get_session
 from acgn_assistant.models.admin_audit_log import AdminAuditLog
+from acgn_assistant.models.conversation import Conversation, Message
+from acgn_assistant.models.events import UserResourceEvent
+from acgn_assistant.models.guestbook import GuestbookMessage
+from acgn_assistant.models.memory import MemoryItem
+from acgn_assistant.models.report import MonthlyReport
+from acgn_assistant.models.user_profile import UserProfile
 from acgn_assistant.models.user import AdminUserUpdate, User, UserCreate, UserPublic, UserUpdate
 from acgn_assistant.routers.deps import get_current_admin_user, get_current_super_admin_user
 
@@ -39,11 +43,11 @@ def delete_user(
     session: Session = Depends(get_session),
     _super_admin=Depends(get_current_super_admin_user),
 ):
-    """Delete an account (super admin only).
+    """Hard-delete an account from DB (super admin only).
 
-    Implementation:
-    - Do not hard-delete rows (may break FK constraints).
-    - Deactivate the account and anonymize identifying fields.
+    Notes:
+    - This endpoint removes the user row and related rows to satisfy FK constraints.
+    - This is irreversible.
     """
 
     user = session.get(User, user_id)
@@ -73,14 +77,7 @@ def delete_user(
         "is_active": bool(getattr(user, "is_active", True)),
     }
 
-    # Deactivate + anonymize.
-    user.is_active = False
-    user.is_admin = False
-    user.email = f"deleted+{user.id}@example.invalid"
-    user.username = "已删除用户"
-    user.hashed_password = hash_password(f"deleted:{uuid4()}")
-
-    # Audit (best-effort)
+    # Best-effort audit: log before deletion.
     try:
         ip = None
         ua = None
@@ -98,7 +95,7 @@ def delete_user(
             AdminAuditLog(
                 actor_user_id=admin.id,
                 actor_email=admin.email,
-                action="admin_user.delete",
+                action="admin_user.hard_delete",
                 target_user_id=user.id,
                 target_email=before.get("email"),
                 ip=ip,
@@ -109,7 +106,23 @@ def delete_user(
     except Exception:
         pass
 
-    session.add(user)
+    # Delete dependent rows first (FK constraints).
+    session.exec(delete(UserProfile).where(UserProfile.user_id == user.id))
+    session.exec(delete(MonthlyReport).where(MonthlyReport.user_id == user.id))
+    session.exec(delete(MemoryItem).where(MemoryItem.user_id == user.id))
+    session.exec(delete(UserResourceEvent).where(UserResourceEvent.user_id == user.id))
+
+    # Delete non-FK related content.
+    session.exec(delete(GuestbookMessage).where(GuestbookMessage.user_id == user.id))
+
+    convo_ids = session.exec(select(Conversation.id).where(Conversation.user_id == user.id)).all()
+    if convo_ids:
+        session.exec(delete(Message).where(Message.conversation_id.in_(list(convo_ids))))
+    session.exec(delete(Conversation).where(Conversation.user_id == user.id))
+
+    # Finally delete the user row.
+    session.delete(user)
+
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

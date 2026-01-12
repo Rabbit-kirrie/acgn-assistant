@@ -230,6 +230,21 @@ def test_admin_can_view_other_users_conversations(tmp_path, monkeypatch):
         r = client.delete(f"/admin/users/{u1_id}", headers=admin_headers)
         assert r.status_code == 204
 
+        # Hard-deleted user should disappear from admin user list.
+        r = client.get("/admin/users", headers=admin_headers)
+        assert r.status_code == 200
+        users = r.json()
+        assert all(u["email"] != "u1@qq.com" for u in users)
+
+        # The deleted user's conversation/messages should no longer be accessible.
+        r = client.get("/admin/conversations", headers=admin_headers)
+        assert r.status_code == 200
+        convos = r.json()
+        assert all(c["id"] != convo_id for c in convos)
+
+        r = client.get(f"/admin/conversations/{convo_id}/messages", headers=admin_headers)
+        assert r.status_code == 404
+
         # Disabled user's existing token is rejected.
         r = client.get("/users/me", headers=user_headers)
         assert r.status_code == 401
