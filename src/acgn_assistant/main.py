@@ -62,6 +62,9 @@ def create_app() -> FastAPI:
     # Browsers often request /favicon.ico by default.
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon() -> RedirectResponse:
+        ico_path = static_dir / "favicon.ico"
+        if ico_path.exists():
+            return RedirectResponse(url="/static/favicon.ico")
         png_path = static_dir / "favicon.png"
         if png_path.exists():
             return RedirectResponse(url="/static/favicon.png")
