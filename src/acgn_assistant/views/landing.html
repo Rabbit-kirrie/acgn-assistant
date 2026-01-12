@@ -2199,6 +2199,7 @@
 
     let adminMode = 'convos';
     let adminSelectedUser = null;
+    let adminIsSuper = false;
 
     function setAdminMode(mode) {
       adminMode = (mode === 'users') ? 'users' : 'convos';
@@ -2277,6 +2278,7 @@
       const isAdmin = !!u?.is_admin;
       const isActive = (u?.is_active !== false);
       const isSelf = String(me?.id || '') === id;
+      const canDelete = !!adminIsSuper && !isSelf;
 
       box.innerHTML = `
         <div style="border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); border-radius:12px; padding:12px;">
@@ -2290,9 +2292,11 @@
           <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">
             <button id="adminBtnToggleActive" type="button" class="btn blue" style="padding:8px 10px; font-size:12px;">${isActive ? '禁用' : '启用'}</button>
             <button id="adminBtnToggleAdmin" type="button" class="btn" style="padding:8px 10px; font-size:12px;">${isAdmin ? '撤销管理员' : '设为管理员'}</button>
+            ${canDelete ? '<button id="adminBtnDeleteUser" type="button" class="btn" style="padding:8px 10px; font-size:12px; background:rgba(239,68,68,.92); border-color:rgba(239,68,68,.55);">删除账号</button>' : ''}
           </div>
           <div style="margin-top:10px; opacity:.7; font-size:12px; line-height:1.4;">
             ${isSelf ? '<div style="margin-top:6px; opacity:.9;">你当前选中的是自己：系统会禁止禁用/撤销自己。</div>' : ''}
+            ${(!adminIsSuper) ? '<div style="margin-top:6px; opacity:.9;">删除账号仅最高管理员可用。</div>' : ''}
           </div>
         </div>
       `;
@@ -2326,6 +2330,32 @@
           toast(`操作失败：${e?.message || e}`);
         }
       });
+
+      document.getElementById('adminBtnDeleteUser')?.addEventListener('click', async () => {
+        try {
+          const ok = confirm('确定要删除该账号吗？\n\n删除将执行：禁用账号 + 匿名化邮箱/昵称（不可恢复）。');
+          if (!ok) return;
+          await api(`/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          toast('已删除账号');
+          adminSelectedUser = null;
+          await loadAdminUsers();
+          try {
+            const box2 = document.getElementById('adminUserDetail');
+            if (box2) box2.innerHTML = '<div style="opacity:.75; font-size:12px; padding:10px;">请选择用户查看详情</div>';
+          } catch (_) {}
+        } catch (e) {
+          toast(`删除失败：${e?.message || e}`);
+        }
+      });
+    }
+
+    async function loadAdminSuperFlag() {
+      try {
+        const r = await api('/admin/users/_super', { method: 'GET' });
+        adminIsSuper = !!r?.is_super_admin;
+      } catch (_) {
+        adminIsSuper = false;
+      }
     }
 
     async function loadAdminUsers() {
@@ -2362,6 +2392,7 @@
             return;
           }
         }
+        await loadAdminSuperFlag();
         setAdminPanelOpen(true);
         setAdminMode('convos');
         await loadAdminConversations();

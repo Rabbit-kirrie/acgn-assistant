@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 from fastapi import Request
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlmodel import Session, select
+from uuid import uuid4
 
 from acgn_assistant.core.config import get_settings
 from acgn_assistant.core.security import hash_password
 from acgn_assistant.db import get_session
 from acgn_assistant.models.admin_audit_log import AdminAuditLog
 from acgn_assistant.models.user import AdminUserUpdate, User, UserCreate, UserPublic, UserUpdate
-from acgn_assistant.routers.deps import get_current_admin_user
+from acgn_assistant.routers.deps import get_current_admin_user, get_current_super_admin_user
 
 router = APIRouter(prefix="/admin/users", tags=["admin"])
+
+
+@router.get("/_super")
+def super_admin_flag(_admin=Depends(get_current_admin_user)):
+    settings = get_settings()
+    admin: User = _admin
+    bootstrap_admin_email = (getattr(settings, "admin_email", "") or "").strip().lower()
+    is_super_admin = (not bootstrap_admin_email) or ((admin.email or "").strip().lower() == bootstrap_admin_email)
+    return {"is_super_admin": bool(is_super_admin)}
 
 
 @router.get("", response_model=list[UserPublic])
@@ -20,6 +30,88 @@ def list_users(
     _admin=Depends(get_current_admin_user),
 ):
     return list(session.exec(select(User).order_by(User.created_at.desc())))
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    _super_admin=Depends(get_current_super_admin_user),
+):
+    """Delete an account (super admin only).
+
+    Implementation:
+    - Do not hard-delete rows (may break FK constraints).
+    - Deactivate the account and anonymize identifying fields.
+    """
+
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+
+    admin: User = _super_admin
+    settings = get_settings()
+    bootstrap_admin_email = (getattr(settings, "admin_email", "") or "").strip().lower()
+    is_bootstrap_admin = bool(bootstrap_admin_email) and (user.email or "").strip().lower() == bootstrap_admin_email
+
+    if is_bootstrap_admin:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能删除最高管理员")
+    if user.id == admin.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能删除自己")
+
+    # Prevent removing the last active admin.
+    if getattr(user, "is_admin", False) and getattr(user, "is_active", True):
+        active_admins = session.exec(select(User).where(User.is_admin == True).where(User.is_active == True)).all()
+        if len(active_admins) <= 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="至少需要保留 1 个可用管理员")
+
+    before = {
+        "email": user.email,
+        "username": user.username,
+        "is_admin": bool(getattr(user, "is_admin", False)),
+        "is_active": bool(getattr(user, "is_active", True)),
+    }
+
+    # Deactivate + anonymize.
+    user.is_active = False
+    user.is_admin = False
+    user.email = f"deleted+{user.id}@example.invalid"
+    user.username = "已删除用户"
+    user.hashed_password = hash_password(f"deleted:{uuid4()}")
+
+    # Audit (best-effort)
+    try:
+        ip = None
+        ua = None
+        if request is not None:
+            try:
+                ip = getattr(getattr(request, "client", None), "host", None)
+            except Exception:
+                ip = None
+            try:
+                ua = request.headers.get("user-agent")
+            except Exception:
+                ua = None
+
+        session.add(
+            AdminAuditLog(
+                actor_user_id=admin.id,
+                actor_email=admin.email,
+                action="admin_user.delete",
+                target_user_id=user.id,
+                target_email=before.get("email"),
+                ip=ip,
+                user_agent=ua,
+                details_json=AdminAuditLog.encode_details({"before": before}),
+            )
+        )
+    except Exception:
+        pass
+
+    session.add(user)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{user_id}", response_model=UserPublic)

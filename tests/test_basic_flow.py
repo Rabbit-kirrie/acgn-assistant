@@ -223,9 +223,12 @@ def test_admin_can_view_other_users_conversations(tmp_path, monkeypatch):
         logs = r.json()
         assert any((it.get("action") == "admin_user.promote_admin" and it.get("target_email") == "u3@qq.com") for it in logs)
 
-        # User deletion is intentionally not supported; ensure it's not exposed.
+        # Only super admin can delete an account.
+        r = client.delete(f"/admin/users/{u1_id}", headers=u2_admin_headers)
+        assert r.status_code == 403
+
         r = client.delete(f"/admin/users/{u1_id}", headers=admin_headers)
-        assert r.status_code == 405
+        assert r.status_code == 204
 
         # Disabled user's existing token is rejected.
         r = client.get("/users/me", headers=user_headers)
@@ -237,7 +240,7 @@ def test_admin_can_view_other_users_conversations(tmp_path, monkeypatch):
             data={"username": "u1@qq.com", "password": "pass1234"},
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        assert r.status_code == 403
+        assert r.status_code in (401, 403)
 
 
 def test_config_requires_smtp_when_debug_disabled(tmp_path, monkeypatch):
