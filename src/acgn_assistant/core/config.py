@@ -126,6 +126,16 @@ def get_settings() -> Settings:
 
     settings = Settings()
 
+    # Postgres driver selection:
+    # We ship psycopg3 (`psycopg`), so normalize plain postgres URLs to
+    # `postgresql+psycopg://...` to avoid SQLAlchemy defaulting to psycopg2.
+    db_url = str(getattr(settings, "database_url", "") or "").strip()
+    if db_url and ("+" not in db_url.split("://", 1)[0]):
+        if db_url.startswith("postgresql://"):
+            settings.database_url = "postgresql+psycopg://" + db_url[len("postgresql://") :]
+        elif db_url.startswith("postgres://"):
+            settings.database_url = "postgresql+psycopg://" + db_url[len("postgres://") :]
+
     # Vercel Functions 的文件系统除 /tmp 外通常不可写；默认 ./app.db 会失败。
     # 若用户未显式设置 DATABASE_URL，则在 Vercel 上将 SQLite 文件改到 /tmp。
     if (os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV")):
