@@ -156,6 +156,7 @@
     .app {
       position: relative;
       height: 100vh;
+      height: 100dvh;
       display: grid;
       grid-template-columns: 300px 1fr;
     }
@@ -1137,7 +1138,7 @@
       .topbar { padding: 10px 12px; gap: 10px; }
       .top-actions { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
       .chat { padding: 14px 14px 34px; }
-      .composer { padding: 10px 10px; }
+      .composer { padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); }
 
       .hero { margin: 5vh auto 0; }
     }
