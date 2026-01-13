@@ -1283,8 +1283,6 @@
         <div class="title title-edit" id="titleWrap">
           <div class="title" id="title">新对话</div>
           <input class="title-input" id="titleInput" style="display:none" placeholder="输入新标题" aria-label="编辑对话标题" title="编辑对话标题" />
-          <button class="icon-btn" id="btnRename" type="button">Edit</button>
-          <button class="icon-btn" id="btnDelete" type="button">Del</button>
         </div>
         <div class="top-actions">
           <button class="pill" type="button" id="btnGuestbook" style="position:relative;">
@@ -4472,23 +4470,7 @@
       location.replace('/login');
     });
 
-    document.getElementById('btnRename').onclick = async () => {
-      try {
-        await ensureGuestToken();
-        beginTitleEdit();
-      } catch (e) {
-        toast(`重命名失败：${e.message}`);
-      }
-    };
-
-    document.getElementById('title').addEventListener('click', async () => {
-      try {
-        await ensureGuestToken();
-        beginTitleEdit();
-      } catch (e) {
-        toast(`重命名失败：${e.message}`);
-      }
-    });
+    // Title rename/delete actions are intentionally only available from the sidebar menu.
 
     document.getElementById('titleInput').addEventListener('keydown', async (e) => {
       if (e.key === 'Escape') {
@@ -4516,15 +4498,6 @@
         toast(`重命名失败：${err.message}`);
       }
     });
-
-    document.getElementById('btnDelete').onclick = async () => {
-      try {
-        await ensureGuestToken();
-        await deleteCurrentConversation();
-      } catch (e) {
-        toast(`删除失败：${e.message}`);
-      }
-    };
 
     // Brand text: bind to full page refresh
     document.querySelector('.brand .brand-name')?.addEventListener('click', (e) => {
