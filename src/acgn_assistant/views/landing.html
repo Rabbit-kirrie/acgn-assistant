@@ -1092,12 +1092,54 @@
       line-height: 1;
     }
 
+    /* Mobile sidebar backdrop (off-canvas sidebar) */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.50);
+      z-index: 999;
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+    }
+
+    /* Mobile-only sidebar toggle in topbar */
+    #btnSidebar {
+      display: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+    }
+
     @media (max-width: 860px) {
       .app { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
+      body.sidebar-open .sidebar-backdrop { display: block; }
+
+      /* Off-canvas sidebar */
+      .sidebar {
+        display: grid;
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: min(86vw, 360px);
+        max-width: 360px;
+        z-index: 1000;
+        transform: translateX(-110%);
+        transition: transform .20s ease;
+        background: rgba(255,255,255,.92);
+      }
+      body.sidebar-open .sidebar { transform: translateX(0); }
+
+      #btnSidebar { display: inline-flex; align-items: center; justify-content: center; }
+
       .title { max-width: 70vw; }
+      .topbar { padding: 10px 12px; gap: 10px; }
+      .top-actions { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
       .chat { padding: 14px 14px 34px; }
       .composer { padding: 10px 10px; }
+
+      .hero { margin: 5vh auto 0; }
     }
 
     /* Spark splash (click FX) */
@@ -1196,6 +1238,7 @@
 </head>
 <body>
   <div class="spark-layer" id="sparkLayer" aria-hidden="true"></div>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <div class="app">
     <aside class="sidebar">
       <a class="brand" href="/app" aria-label="ACGN咨询助手">
@@ -1232,6 +1275,9 @@
 
     <main class="main">
       <header class="topbar">
+        <button class="icon-btn" id="btnSidebar" type="button" aria-label="打开侧边栏" title="菜单">
+          <i class="fa-solid fa-bars" aria-hidden="true"></i>
+        </button>
         <div class="title title-edit" id="titleWrap">
           <div class="title" id="title">新对话</div>
           <input class="title-input" id="titleInput" style="display:none" placeholder="输入新标题" aria-label="编辑对话标题" title="编辑对话标题" />
@@ -1401,6 +1447,26 @@
     let editContext = null; // { messageId: string }
 
     let scrollQuickTimer = null;
+
+    // Mobile sidebar state
+    function _isMobileLayout() {
+      try { return window.matchMedia && window.matchMedia('(max-width: 860px)').matches; } catch (_) { return false; }
+    }
+
+    function openSidebar() {
+      try { document.body.classList.add('sidebar-open'); } catch (_) {}
+    }
+
+    function closeSidebar() {
+      try { document.body.classList.remove('sidebar-open'); } catch (_) {}
+    }
+
+    function toggleSidebar() {
+      try {
+        if (document.body.classList.contains('sidebar-open')) closeSidebar();
+        else openSidebar();
+      } catch (_) {}
+    }
 
     // Guestbook state
     let guestbookOpen = false;
@@ -2836,6 +2902,20 @@
       return data;
     }
 
+    // Mobile sidebar interactions
+    try {
+      document.getElementById('btnSidebar')?.addEventListener('click', () => {
+        if (!_isMobileLayout()) return;
+        toggleSidebar();
+      });
+      document.getElementById('sidebarBackdrop')?.addEventListener('click', () => {
+        closeSidebar();
+      });
+      window.addEventListener('resize', () => {
+        if (!_isMobileLayout()) closeSidebar();
+      });
+    } catch (_) {}
+
     function deriveTitleFromText(text) {
       const t = (text || '').trim();
       if (!t) return '新对话';
@@ -3139,6 +3219,7 @@
           row.appendChild(more);
           row.onclick = async () => {
             try {
+              if (_isMobileLayout()) closeSidebar();
               setActiveConversation(c.id);
               await loadMessages();
             } catch (e) {
@@ -3812,6 +3893,7 @@
     // Events
     document.getElementById('btnNew').onclick = async () => {
       try {
+        if (_isMobileLayout()) closeSidebar();
         await ensureGuestToken();
         await startNewConversation();
       } catch (e) {
@@ -3820,6 +3902,7 @@
     };
 
     document.getElementById('sbSearch').addEventListener('input', () => {
+      if (_isMobileLayout()) openSidebar();
       renderConversationList();
     });
 
@@ -3828,6 +3911,7 @@
     });
 
     document.getElementById('btnAdmin')?.addEventListener('click', async () => {
+      if (_isMobileLayout()) closeSidebar();
       await openAdminPanel();
     });
 
