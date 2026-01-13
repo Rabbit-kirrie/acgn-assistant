@@ -157,6 +157,7 @@
       position: relative;
       height: 100vh;
       height: 100dvh;
+      height: var(--app-height, 100dvh);
       display: grid;
       grid-template-columns: 300px 1fr;
     }
@@ -2940,6 +2941,44 @@
       const h = composer.getBoundingClientRect().height;
       el.style.bottom = `${Math.round(h + 16)}px`;
     }
+
+    // Android Chrome: when the on-screen keyboard opens, the layout may not shrink
+    // as expected. Use visualViewport to keep the composer visible.
+    (function setupMobileKeyboardViewportWorkaround() {
+      try {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        const root = document.documentElement;
+        let raf = 0;
+        const apply = () => {
+          if (raf) cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(() => {
+            raf = 0;
+            const h = Math.round(vv.height || window.innerHeight || 0);
+            if (h > 0) root.style.setProperty('--app-height', `${h}px`);
+            try { updateScrollQuickPosition(); } catch (_) {}
+          });
+        };
+        apply();
+        vv.addEventListener('resize', apply);
+        vv.addEventListener('scroll', apply);
+
+        const box = document.getElementById('text');
+        if (box) {
+          box.addEventListener('focus', () => {
+            apply();
+            // Allow keyboard animation to settle before snapping.
+            setTimeout(() => {
+              try { scrollToBottom(true); } catch (_) {}
+              try { updateScrollQuickPosition(); } catch (_) {}
+            }, 180);
+          });
+          box.addEventListener('blur', () => {
+            setTimeout(apply, 120);
+          });
+        }
+      } catch (_) {}
+    })();
 
     function hideScrollQuick() {
       const el = document.getElementById('scrollQuick');
