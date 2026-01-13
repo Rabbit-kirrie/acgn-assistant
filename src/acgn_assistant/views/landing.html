@@ -2185,7 +2185,7 @@
         const id = String(c?.id || '').trim();
         const title = String(c?.title || '').trim() || '(无标题)';
         const who = String(c?.user_username || '').trim() || String(c?.user_email || '').trim() || String(c?.user_id || '').trim();
-        const when = String(c?.created_at || '').slice(0, 19).replace('T', ' ');
+        const when = fmtBeijing(c?.created_at, { withSeconds: true });
 
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -2225,7 +2225,7 @@
       const parts = [];
       for (const m of arr) {
         const role = String(m?.role || '').trim() || 'unknown';
-        const when = String(m?.created_at || '').slice(0, 19).replace('T', ' ');
+        const when = fmtBeijing(m?.created_at, { withSeconds: true });
         const content = escapeHtml(String(m?.content || ''));
         parts.push(
           `<div style="border:1px solid rgba(255,255,255,.20); background:rgba(255,255,255,.10); border-radius:10px; padding:10px; margin-bottom:10px;">` +
@@ -2525,6 +2525,78 @@
 
     function escapeHtml(s) {
       return (s || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    }
+
+    function parseIsoDateAssumeUtcIfMissingTz(iso) {
+      try {
+        let s = String(iso || '').trim();
+        if (!s) return null;
+
+        // Normalize common backend formats.
+        // 1) "YYYY-MM-DD HH:mm:ss" -> "YYYY-MM-DDTHH:mm:ss"
+        if (s.includes(' ') && !s.includes('T')) s = s.replace(' ', 'T');
+        // 2) "+0800" -> "+08:00"
+        s = s.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+
+        const hasTz = /[zZ]$|[+-]\d{2}:\d{2}$/.test(s);
+        const looksIsoNoTz = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(s);
+        if (!hasTz && looksIsoNoTz) {
+          // Server timestamps are UTC (utcnow); if tz is missing, assume UTC.
+          s += 'Z';
+        }
+
+        const d = new Date(s);
+        if (Number.isNaN(d.getTime())) return null;
+        return d;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function fmtBeijing(iso, { withSeconds = true } = {}) {
+      try {
+        const d = parseIsoDateAssumeUtcIfMissingTz(iso);
+        if (!d) return String(iso || '');
+
+        // Prefer Intl when available.
+        try {
+          if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+            const parts = new Intl.DateTimeFormat('zh-CN', {
+              timeZone: 'Asia/Shanghai',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: withSeconds ? '2-digit' : undefined,
+              hourCycle: 'h23',
+            }).formatToParts(d);
+            const get = (t) => (parts.find(p => p.type === t)?.value || '');
+            const y = get('year');
+            const m = get('month');
+            const day = get('day');
+            const hh = get('hour');
+            const mm = get('minute');
+            const ss = withSeconds ? get('second') : '';
+            if (y && m && day && hh && mm && (!withSeconds || ss)) {
+              return withSeconds ? `${y}-${m}-${day} ${hh}:${mm}:${ss}` : `${y}-${m}-${day} ${hh}:${mm}`;
+            }
+          }
+        } catch (_) {}
+
+        // Fallback: UTC+8 conversion without relying on Intl.
+        const ms = d.getTime() + 8 * 60 * 60 * 1000;
+        const bj = new Date(ms);
+        const y = bj.getUTCFullYear();
+        const m = String(bj.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(bj.getUTCDate()).padStart(2, '0');
+        const hh = String(bj.getUTCHours()).padStart(2, '0');
+        const mm = String(bj.getUTCMinutes()).padStart(2, '0');
+        const ss = String(bj.getUTCSeconds()).padStart(2, '0');
+        return withSeconds ? `${y}-${m}-${day} ${hh}:${mm}:${ss}` : `${y}-${m}-${day} ${hh}:${mm}`;
+      } catch (_) {
+        return String(iso || '');
+      }
     }
 
     async function copyToClipboard(text) {
